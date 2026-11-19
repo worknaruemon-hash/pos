@@ -311,6 +311,18 @@ body.locked nav.tabs{visibility:hidden}
 .tnr{display:grid;grid-template-columns:30px 1fr;align-items:center;gap:8px}
 .tnr .num{font-family:var(--f-num);font-weight:800;text-align:center;color:var(--muted)}
 .tbl .tn{font-weight:700;font-size:14px;line-height:1.25;margin-top:-2px}
+.plan{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:86px;gap:10px;padding:14px;border:2px solid var(--line);border-radius:22px;background:var(--surface-2);max-width:640px;margin:0 auto 28px}
+.pt{position:relative;z-index:1;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:6px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:2px;min-width:0;overflow:hidden}
+.pt .pn{font-weight:800;font-size:16px;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pt .ps{font-size:11.5px;color:var(--muted);line-height:1.3}
+.pt .ps b{font-family:var(--f-num);font-size:15px;color:var(--ink)}
+.pt.busy{background:var(--yolk-soft);border:2px solid var(--yolk)}
+.pt .pb svg{position:absolute;top:5px;right:5px;width:22px;height:22px}
+.plan.edit .pt{border:2px dashed var(--green);cursor:grab}
+.pt.sel{outline:3px solid var(--yolk);outline-offset:2px;background:var(--green-soft)}
+.slot{border:1px dashed var(--line);border-radius:10px;background:transparent}
+.slot:hover{background:var(--green-soft)}
+@media (max-width:420px){.plan{gap:7px;padding:10px;grid-auto-rows:78px}.pt .pn{font-size:14.5px}.pt .ps{font-size:10.5px}}
 .ks.ok{color:var(--green)}
 body:has(#ov) .snack,body:has(.cart.open) .snack{bottom:auto;top:calc(14px + env(safe-area-inset-top,0px))}
 .cart-f .row .btn.yolk{flex:1.2}
@@ -670,15 +682,11 @@ function floorHTML(){
     <div class="t"><span>บิลวันนี้</span><b>${tb.length}</b></div>
     <div class="t"><span>ออเดอร์ที่ยังไม่ชำระ</span><b>${openOrders.filter(o=>o.items.length).length} · ${baht(openVal)}</b></div></div>`;
   if(state.readOnly)h+=`<div class="note">บัญชีนี้ดูได้อย่างเดียว ให้เจ้าของแชร์สิทธิ์ระดับ Contributor ขึ้นไปเพื่อรับออเดอร์ได้</div>`;
-  h+=`<div class="sec-h"><h2>โต๊ะในร้าน</h2><button class="btn sm" data-a="tables">✏️ เพิ่ม / แก้ชื่อโต๊ะ</button></div><div class="tables">`;
-  for(let i=1;i<=n;i++){
-    const o=state.orders['table-'+i];const busy=o&&o.items.length;
-    const mins=busy?Math.max(0,Math.round((Date.now()-o.openedAt)/60000)):0;
-    h+=`<button class="tbl ${busy?'busy':''}" data-a="table" data-n="${i}" aria-label="โต๊ะ ${i}">
-      <div class="plate">${busy?BREAD:''}<span class="n">${i}</span></div>${(state.config.tableNames||{})[i]?`<div class="tn">${esc(state.config.tableNames[i])}</div>`:''}
-      <div class="st">${busy?`<b>${baht(orderTotal(o))}</b>${orderCount(o)} รายการ · ${mins<60?mins+' นาที':Math.floor(mins/60)+' ชม. '+(mins%60)+' น.'}`:'ว่าง'}</div></button>`;
-  }
-  h+=`</div><div class="sec-h"><h2>Take away</h2><p>สั่งกลับบ้าน เพิ่มได้ไม่จำกัด</p></div><div class="tickets">
+  if(!state.readOnly)syncTableLabels();
+  h+=state.planEdit?`<div class="sec-h"><h2>จัดผังร้าน</h2><button class="btn sm pri" data-a="planDone">✓ เสร็จ</button></div>${planToolbar()}`
+    :`<div class="sec-h"><h2>โต๊ะในร้าน</h2><div style="display:flex;gap:6px"><button class="btn sm" data-a="planEdit">🧭 จัดผัง</button><button class="btn sm" data-a="tables">✏️ เพิ่ม / แก้ชื่อโต๊ะ</button></div></div>`;
+  h+=planHTML(!!state.planEdit);
+  h+=`<div class="sec-h"><h2>Take away</h2><p>สั่งกลับบ้าน เพิ่มได้ไม่จำกัด</p></div><div class="tickets">
     <button class="ticket add" data-a="newTA"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>เพิ่ม Take away</button>`;
   openOrders.filter(o=>o.type==='ta').sort((a,b)=>a.openedAt-b.openedAt).forEach(o=>{
     h+=`<button class="ticket" data-a="ta" data-id="${esc(o.id)}"><h3>${esc(o.label)}</h3><div class="meta">${esc(o.customer||'ไม่ระบุชื่อ')} · รับออเดอร์ ${tstr(o.openedAt)}</div><b>${baht(orderTotal(o))}</b><div class="meta">${orderCount(o)} รายการ</div></button>`;
@@ -855,12 +863,34 @@ function receiptSheet(b,fresh=true){rcBill=b;rcPngFile=null;receiptPng(b).then(b
   <div class="acts" style="margin-top:8px"><button class="btn pri" data-a="closeSheet">เสร็จ</button></div>`)}
 function printBill(b){$('#printArea').innerHTML=receiptHTML(b);try{window.print()}catch(e){toast('พิมพ์จากหน้านี้ไม่ได้ ใช้ “ไฟล์สำหรับพิมพ์” แทน')}}
 /* ================== โต๊ะ ================== */
-function tableName(n){return (state.config.tableNames||{})[n]||'โต๊ะ '+n}
+const DEFAULT_TN={6:'1 ขาว',7:'2 ขาว',8:'3 ขาว',9:'4 ขาว',10:'นอกบ้าน'};
+/* ผังร้านตามภาพร่าง: [คอลัมน์, แถว, กว้าง, สูง] บนกริด 6 คอลัมน์ */
+const DEFAULT_LAYOUT={10:[4,1,3,1],1:[1,2,2,1],6:[4,2,3,1],2:[1,3,2,1],7:[4,3,3,1],8:[4,4,3,1],3:[1,5,2,1],9:[4,5,3,1],4:[1,6,3,1],5:[1,7,3,1]};
+function tableName(n){return (state.config.tableNames||{})[n]||DEFAULT_TN[n]||'โต๊ะ '+n}
+function layoutOf(){const n=Math.max(1,Math.min(60,+state.config.tables||10));const L={...DEFAULT_LAYOUT,...(state.config.layout||{})};const out={};let maxR=0;
+  for(let i=1;i<=n;i++)if(L[i]){out[i]=L[i].map(Number);maxR=Math.max(maxR,out[i][1]+out[i][3]-1)}
+  let r=maxR+1,c=1;for(let i=1;i<=n;i++)if(!out[i]){out[i]=[c,r,2,1];c+=2;if(c>5){c=1;r++}}
+  return out}
+function overlaps(L,n,p){return Object.entries(L).some(([k,q])=>+k!==+n&&p[0]<q[0]+q[2]&&q[0]<p[0]+p[2]&&p[1]<q[1]+q[3]&&q[1]<p[1]+p[3])}
+function planHTML(edit){const L=layoutOf();const rows=Math.max(...Object.values(L).map(p=>p[1]+p[3]-1))+(edit?2:0);
+  let h=`<div class="plan ${edit?'edit':''}">`;
+  if(edit)for(let r=1;r<=rows;r++)for(let c=1;c<=6;c++)h+=`<button class="slot" data-a="slot" data-c="${c}" data-r="${r}" style="grid-area:${r}/${c}/${r+1}/${c+1}" aria-label="ช่องว่าง"></button>`;
+  for(const [n,p] of Object.entries(L)){const o=state.orders['table-'+n];const busy=o&&o.items.length;
+    const mins=busy?Math.max(0,Math.round((Date.now()-o.openedAt)/60000)):0;
+    h+=`<button class="pt ${busy?'busy':''} ${edit&&+state.selT===+n?'sel':''}" data-a="${edit?'pickT':'table'}" data-n="${n}" style="grid-area:${p[1]}/${p[0]}/${p[1]+p[3]}/${p[0]+p[2]}">
+      ${busy?`<span class="pb">${BREAD}</span>`:''}<b class="pn">${esc(tableName(n))}</b>
+      <span class="ps">${busy?`<b>${baht(orderTotal(o))}</b><br>${orderCount(o)} รายการ · ${mins<60?mins+' นาที':Math.floor(mins/60)+' ชม.'}`:(edit?'':'ว่าง')}</span></button>`}
+  return h+'</div>'}
+function planToolbar(){const s=state.selT;
+  return `<div class="note" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">${s?`<b>${esc(tableName(s))}</b> · แตะช่องว่างเพื่อย้าย <span style="flex:1"></span>
+    <button class="btn sm" data-a="tSize" data-d="w-">แคบลง</button><button class="btn sm" data-a="tSize" data-d="w+">กว้างขึ้น</button><button class="btn sm" data-a="tSize" data-d="h-">เตี้ยลง</button><button class="btn sm" data-a="tSize" data-d="h+">สูงขึ้น</button>`
+    :`แตะโต๊ะที่ต้องการย้าย แล้วแตะช่องว่างที่จะวาง <span style="flex:1"></span><button class="btn sm ghost" data-a="planReset">กลับเป็นผังเริ่มต้น</button>`}</div>`}
+function setLayout(n,p){const lay={...(state.config.layout||{})};lay[n]=p;state.config.layout=lay;saveConfig();render()}
 function syncTableLabels(){for(const o of Object.values(state.orders)){if(o.type==='table'&&o.label!==tableName(o.no)){const c=clone(o);c.label=tableName(o.no);state.orders[o.id]=c;queueSave(o.id)}}}
 function tablesSheet(){openSheet(()=>{const n=+state.config.tables||10;const names=state.config.tableNames||{};
   return `<h3>จัดการโต๊ะ</h3><p class="lead">เพิ่มหรือลดจำนวนโต๊ะ และตั้งชื่อเองได้ เช่น “ริมหน้าต่าง” “โซฟา” เว้นว่างไว้ = ใช้ชื่อเดิม</p>
   <div class="stepper"><button data-a="tblN" data-d="-1" aria-label="ลดโต๊ะ">−</button><b>${n}</b><button data-a="tblN" data-d="1" aria-label="เพิ่มโต๊ะ">+</button><span style="color:var(--muted)">โต๊ะ</span></div>
-  <div class="tnames">${Array.from({length:n},(_,i)=>`<label class="tnr"><span class="num">${i+1}</span><input class="inp" data-in="tname" data-n="${i+1}" value="${esc(names[i+1]||'')}" placeholder="โต๊ะ ${i+1}" aria-label="ชื่อโต๊ะ ${i+1}"></label>`).join('')}</div>
+  <div class="tnames">${Array.from({length:n},(_,i)=>`<label class="tnr"><span class="num">${i+1}</span><input class="inp" data-in="tname" data-n="${i+1}" value="${esc(names[i+1]||'')}" placeholder="${esc(DEFAULT_TN[i+1]||'โต๊ะ '+(i+1))}" aria-label="ชื่อโต๊ะ ${i+1}"></label>`).join('')}</div>
   <div class="acts"><button class="btn pri" data-a="tblDone">เสร็จ</button></div>`})}
 /* ================== ใบสั่งครัว ================== */
 function unsentCount(o){return (o.items||[]).reduce((s,l)=>s+Math.max(0,l.qty-(l.sent||0)),0)+(o.voids||[]).filter(v=>!v.printed).length}
@@ -1070,6 +1100,15 @@ const A={
     if(navigator.canShare&&navigator.canShare({files:[ktFile]}))navigator.share({files:[ktFile]}).then(()=>markSent()).catch(e=>{if(e&&e.name!=='AbortError')toast('แชร์ไม่ได้')});
     else{saveFile(ktFile.name,ktFile);markSent()}},
   closeSheet:()=>closeSheet(),
+  planEdit:()=>{if(state.readOnly){toast('บัญชีนี้ดูได้อย่างเดียว');return}state.planEdit=true;state.selT=null;render()},
+  planDone:()=>{state.planEdit=false;state.selT=null;render()},
+  pickT:t=>{state.selT=+state.selT===+t.dataset.n?null:+t.dataset.n;render()},
+  slot:t=>{const s=state.selT;if(!s){toast('แตะเลือกโต๊ะก่อน');return}const L=layoutOf();const p=[...L[s]];p[0]=Math.min(+t.dataset.c,7-p[2]);p[1]=+t.dataset.r;
+    if(overlaps(L,s,p)){toast('ทับโต๊ะอื่น เลือกช่องอื่น');return}setLayout(s,p)},
+  tSize:t=>{const s=state.selT;if(!s)return;const L=layoutOf();const p=[...L[s]];const d=t.dataset.d;
+    if(d==='w+')p[2]=Math.min(6,p[2]+1);if(d==='w-')p[2]=Math.max(1,p[2]-1);if(d==='h+')p[3]=Math.min(3,p[3]+1);if(d==='h-')p[3]=Math.max(1,p[3]-1);
+    if(p[0]+p[2]>7)p[0]=7-p[2];if(overlaps(L,s,p)){toast('ชนโต๊ะข้างๆ ย้ายก่อนค่อยขยาย');return}setLayout(s,p)},
+  planReset:async()=>{if(!(await confirmBox('กลับเป็นผังเริ่มต้น?','ตำแหน่งโต๊ะที่ย้ายไว้จะกลับเป็นตามภาพร่างผังร้าน','กลับเป็นค่าเริ่มต้น')))return;state.config.layout={};saveConfig();state.selT=null;render()},
   home:()=>{if(state.view==='login')return;A.closeCart();closeSheet();
     if(state.view==='floor'&&window.scrollY<10){location.reload();return}
     state.view='floor';state.activeId=null;state.draft=null;state.histAll=false;render();window.scrollTo({top:0,behavior:'smooth'})},
