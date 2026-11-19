@@ -307,6 +307,10 @@ body.locked nav.tabs{visibility:hidden}
 .lndel{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);font-size:15px}
 .lndel:hover{border-color:var(--tomato);background:var(--tomato-soft)}
 .ks{display:inline-block;margin:5px 0 0 6px;font-size:11.5px;font-weight:600;color:var(--tomato)}
+.tnames{display:grid;gap:8px;max-height:48vh;overflow:auto;padding:2px}
+.tnr{display:grid;grid-template-columns:30px 1fr;align-items:center;gap:8px}
+.tnr .num{font-family:var(--f-num);font-weight:800;text-align:center;color:var(--muted)}
+.tbl .tn{font-weight:700;font-size:14px;line-height:1.25;margin-top:-2px}
 .ks.ok{color:var(--green)}
 body:has(#ov) .snack,body:has(.cart.open) .snack{bottom:auto;top:calc(14px + env(safe-area-inset-top,0px))}
 .cart-f .row .btn.yolk{flex:1.2}
@@ -327,7 +331,7 @@ body:has(#ov) .snack,body:has(.cart.open) .snack{bottom:auto;top:calc(14px + env
 </head>
 <body>
 <header><div class="hd">
-  <div class="brand"><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><path d="M8 17c-4-1-5-6-2-9 3-4 9-5 14-5s11 1 14 5c3 3 2 8-2 9v15a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3z" fill="#F7D894" stroke="#C4843E" stroke-width="2.6" stroke-linejoin="round"/><circle cx="15" cy="21" r="1.9" fill="#4A2E14"/><circle cx="25" cy="21" r="1.9" fill="#4A2E14"/><path d="M17.4 25.2q2.6 2.4 5.2 0" stroke="#4A2E14" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="11.5" cy="25" r="2.1" fill="#F29A8E" opacity=".75"/><circle cx="28.5" cy="25" r="2.1" fill="#F29A8E" opacity=".75"/></svg><div><b id="shopName">Da’s Home Bakery</b><small id="shopSub">The Breakfast Club</small></div></div>
+  <div class="brand" data-a="home" role="button" tabindex="0" style="cursor:pointer" title="กลับหน้ารวมโต๊ะ"><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><path d="M8 17c-4-1-5-6-2-9 3-4 9-5 14-5s11 1 14 5c3 3 2 8-2 9v15a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3z" fill="#F7D894" stroke="#C4843E" stroke-width="2.6" stroke-linejoin="round"/><circle cx="15" cy="21" r="1.9" fill="#4A2E14"/><circle cx="25" cy="21" r="1.9" fill="#4A2E14"/><path d="M17.4 25.2q2.6 2.4 5.2 0" stroke="#4A2E14" stroke-width="1.7" fill="none" stroke-linecap="round"/><circle cx="11.5" cy="25" r="2.1" fill="#F29A8E" opacity=".75"/><circle cx="28.5" cy="25" r="2.1" fill="#F29A8E" opacity=".75"/></svg><div><b id="shopName">Da’s Home Bakery</b><small id="shopSub">The Breakfast Club</small></div></div>
   <nav class="tabs" id="tabs">
     <button data-a="nav" data-v="floor" class="on">โต๊ะ &amp; ออเดอร์</button>
     <button data-a="nav" data-v="dash">แดชบอร์ด</button>
@@ -621,7 +625,7 @@ function onData(kind){
 
 /* ================== orders ================== */
 function getActive(){return state.orders[state.activeId]||(state.draft&&state.draft.id===state.activeId?state.draft:null)}
-function openTable(n){const id='table-'+n;state.activeId=id;state.draft=state.orders[id]?null:{id,type:'table',no:n,label:'โต๊ะ '+n,customer:'',items:[],openedAt:Date.now(),updatedAt:Date.now()};goOrder()}
+function openTable(n){const id='table-'+n;state.activeId=id;state.draft=state.orders[id]?null:{id,type:'table',no:n,label:tableName(n),customer:'',items:[],openedAt:Date.now(),updatedAt:Date.now()};goOrder()}
 function openTA(id){state.activeId=id;state.draft=null;goOrder()}
 function newTA(){
   const today=dayKey(new Date());
@@ -666,12 +670,12 @@ function floorHTML(){
     <div class="t"><span>บิลวันนี้</span><b>${tb.length}</b></div>
     <div class="t"><span>ออเดอร์ที่ยังไม่ชำระ</span><b>${openOrders.filter(o=>o.items.length).length} · ${baht(openVal)}</b></div></div>`;
   if(state.readOnly)h+=`<div class="note">บัญชีนี้ดูได้อย่างเดียว ให้เจ้าของแชร์สิทธิ์ระดับ Contributor ขึ้นไปเพื่อรับออเดอร์ได้</div>`;
-  h+=`<div class="sec-h"><h2>โต๊ะในร้าน</h2><p>แตะโต๊ะเพื่อรับออเดอร์</p></div><div class="tables">`;
+  h+=`<div class="sec-h"><h2>โต๊ะในร้าน</h2><button class="btn sm" data-a="tables">✏️ เพิ่ม / แก้ชื่อโต๊ะ</button></div><div class="tables">`;
   for(let i=1;i<=n;i++){
     const o=state.orders['table-'+i];const busy=o&&o.items.length;
     const mins=busy?Math.max(0,Math.round((Date.now()-o.openedAt)/60000)):0;
     h+=`<button class="tbl ${busy?'busy':''}" data-a="table" data-n="${i}" aria-label="โต๊ะ ${i}">
-      <div class="plate">${busy?BREAD:''}<span class="n">${i}</span></div>
+      <div class="plate">${busy?BREAD:''}<span class="n">${i}</span></div>${(state.config.tableNames||{})[i]?`<div class="tn">${esc(state.config.tableNames[i])}</div>`:''}
       <div class="st">${busy?`<b>${baht(orderTotal(o))}</b>${orderCount(o)} รายการ · ${mins<60?mins+' นาที':Math.floor(mins/60)+' ชม. '+(mins%60)+' น.'}`:'ว่าง'}</div></button>`;
   }
   h+=`</div><div class="sec-h"><h2>Take away</h2><p>สั่งกลับบ้าน เพิ่มได้ไม่จำกัด</p></div><div class="tickets">
@@ -850,6 +854,14 @@ function receiptSheet(b,fresh=true){rcBill=b;rcPngFile=null;receiptPng(b).then(b
   <div class="acts">${CAN_SHARE?'<button class="btn yolk" data-a="sharePng" style="flex-basis:100%">📤 แชร์ไปเครื่องพิมพ์</button>':''}<button class="btn ${CAN_SHARE?'':'yolk'}" data-a="print">พิมพ์บิล</button><button class="btn" data-a="dlPng">บันทึกรูป PNG</button><button class="btn" data-a="dlHtml">ไฟล์สำหรับพิมพ์</button></div>
   <div class="acts" style="margin-top:8px"><button class="btn pri" data-a="closeSheet">เสร็จ</button></div>`)}
 function printBill(b){$('#printArea').innerHTML=receiptHTML(b);try{window.print()}catch(e){toast('พิมพ์จากหน้านี้ไม่ได้ ใช้ “ไฟล์สำหรับพิมพ์” แทน')}}
+/* ================== โต๊ะ ================== */
+function tableName(n){return (state.config.tableNames||{})[n]||'โต๊ะ '+n}
+function syncTableLabels(){for(const o of Object.values(state.orders)){if(o.type==='table'&&o.label!==tableName(o.no)){const c=clone(o);c.label=tableName(o.no);state.orders[o.id]=c;queueSave(o.id)}}}
+function tablesSheet(){openSheet(()=>{const n=+state.config.tables||10;const names=state.config.tableNames||{};
+  return `<h3>จัดการโต๊ะ</h3><p class="lead">เพิ่มหรือลดจำนวนโต๊ะ และตั้งชื่อเองได้ เช่น “ริมหน้าต่าง” “โซฟา” เว้นว่างไว้ = ใช้ชื่อเดิม</p>
+  <div class="stepper"><button data-a="tblN" data-d="-1" aria-label="ลดโต๊ะ">−</button><b>${n}</b><button data-a="tblN" data-d="1" aria-label="เพิ่มโต๊ะ">+</button><span style="color:var(--muted)">โต๊ะ</span></div>
+  <div class="tnames">${Array.from({length:n},(_,i)=>`<label class="tnr"><span class="num">${i+1}</span><input class="inp" data-in="tname" data-n="${i+1}" value="${esc(names[i+1]||'')}" placeholder="โต๊ะ ${i+1}" aria-label="ชื่อโต๊ะ ${i+1}"></label>`).join('')}</div>
+  <div class="acts"><button class="btn pri" data-a="tblDone">เสร็จ</button></div>`})}
 /* ================== ใบสั่งครัว ================== */
 function unsentCount(o){return (o.items||[]).reduce((s,l)=>s+Math.max(0,l.qty-(l.sent||0)),0)+(o.voids||[]).filter(v=>!v.printed).length}
 function addVoid(o,l,q){if(q>0)o.voids=[...(o.voids||[]),{name:l.name,qty:q,opts:(l.opts||[]).filter(Boolean),at:Date.now()}]}
@@ -862,11 +874,12 @@ function kitchenHTML(t){return `<div class="rc kt"><div class="c"><div class="sh
   <div>${t.type==='ta'?'TAKE AWAY':'นั่งทาน'} · รอบที่ ${t.round}${t.all?' (พิมพ์ซ้ำทั้งหมด)':''}</div><div>${dstr(t.at)} ${tstr(t.at)}</div></div><hr>
   ${t.items.map(l=>`<div class="ki"><b>${l.qty} × ${esc(l.name)}</b>${l.opts.map(x=>`<div class="ko">• ${esc(x)}</div>`).join('')}${l.addons.map(x=>`<div class="ko">+ ${esc(x)}</div>`).join('')}${l.note?`<div class="kn">หมายเหตุ: ${esc(l.note)}</div>`:''}</div>`).join('')}
   ${t.voids.length?`<div class="kv"><div class="c"><b>*** ยกเลิก ***</b></div>${t.voids.map(v=>`<div><b>${v.qty} × ${esc(v.name)}</b>${v.opts&&v.opts.length?` (${v.opts.map(esc).join(', ')})`:''}</div>`).join('')}</div>`:''}</div>`}
-async function drawRows(rows){const W=576,P=28;const F='"Anuphan","Noto Sans Thai","Leelawadee UI",Thonburi,sans-serif';try{await document.fonts.ready}catch(e){}
+function paperW(){return state.config.paper==='58'?384:576}
+async function drawRows(rows){const W=paperW(),P=W<500?14:28,K=W<500?.8:1;const F='"Anuphan","Noto Sans Thai","Leelawadee UI",Thonburi,sans-serif';try{await document.fonts.ready}catch(e){}
   const cv=document.createElement('canvas');const ctx=cv.getContext('2d');
   const wrap=(t,w,font)=>{ctx.font=font;const out=[];let cur='';for(const ch of Array.from(t)){if(ctx.measureText(cur+ch).width>w&&cur){out.push(cur);cur=ch}else cur+=ch}out.push(cur);return out};
   const lay=[];let y=P;
-  rows.forEach(r=>{if(r.hr){lay.push({hr:1,y:y+10});y+=24;return}const sz=r.sz||30;const font=`${r.b?700:400} ${sz}px ${F}`;const ind=r.ind||0;
+  rows.forEach(r=>{if(r.hr){lay.push({hr:1,y:y+10});y+=24;return}const sz=Math.round((r.sz||30)*K);const font=`${r.b?700:400} ${sz}px ${F}`;const ind=r.ind||0;
     wrap(r.l,W-2*P-ind,font).forEach(ln=>{lay.push({t:ln,font,c:r.c,x:P+ind,y:y+sz});y+=sz*1.35})});
   cv.width=W;cv.height=Math.ceil(y+P);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,cv.height);ctx.fillStyle='#000';
   lay.forEach(o=>{if(o.hr){ctx.setLineDash([8,6]);ctx.strokeStyle='#444';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(P,o.y);ctx.lineTo(W-P,o.y);ctx.stroke();return}
@@ -900,7 +913,7 @@ hr{border:0;border-top:1px dashed #888;margin:8px 0}table{width:100%;border-coll
 .ad{color:#555;font-size:11.5px;padding-left:12px}.big td{font-weight:700;font-size:15px;padding-top:4px}@media print{body{background:#fff}.rc{padding:0}}</style></head>
 <body>${receiptHTML(b)}<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},300)})<\/script></body></html>`}
 async function receiptPng(b){
-  const s=state.config.shop||DEFAULT_CFG.shop;const W=576,P=28;const F='"Anuphan","Noto Sans Thai","Leelawadee UI",Thonburi,sans-serif';
+  const s=state.config.shop||DEFAULT_CFG.shop;const W=paperW(),P=W<500?14:28,K=W<500?.8:1;const F='"Anuphan","Noto Sans Thai","Leelawadee UI",Thonburi,sans-serif';
   try{await document.fonts.ready}catch(e){}
   const rows=[];const T=(l,r='',o={})=>rows.push({l,r,...o});
   T(s.name,'',{c:1,sz:34,b:1});if(s.sub)T(s.sub,'',{c:1});if(s.addr)T(s.addr,'',{c:1});T('','',{hr:1});
@@ -912,7 +925,7 @@ async function receiptPng(b){
   const cv=document.createElement('canvas');const ctx=cv.getContext('2d');
   const wrap=(t,w,font)=>{ctx.font=font;const out=[];let cur='';for(const ch of Array.from(t)){if(ctx.measureText(cur+ch).width>w&&cur){out.push(cur);cur=ch}else cur+=ch}out.push(cur);return out};
   const lay=[];let y=P;
-  rows.forEach(r=>{if(r.hr){lay.push({hr:1,y:y+10});y+=22;return}const sz=r.sz||(r.sm?22:26);const font=`${r.b?700:400} ${sz}px ${F}`;
+  rows.forEach(r=>{if(r.hr){lay.push({hr:1,y:y+10});y+=22;return}const sz=Math.round((r.sz||(r.sm?22:26))*K);const font=`${r.b?700:400} ${sz}px ${F}`;
     ctx.font=font;const rw=r.r?ctx.measureText(r.r).width+16:0;const lines=wrap(r.l,W-2*P-rw,font);
     lines.forEach((ln,i)=>{lay.push({t:ln,r:i===0?r.r:'',font,c:r.c,y:y+sz});y+=sz*1.4})});
   cv.width=W;cv.height=Math.ceil(y+P);ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='#111';
@@ -1012,7 +1025,8 @@ function manageHTML(){
       <label class="f" for="sSub">คำรอง</label><input class="inp" id="sSub" data-in="shop" data-k="sub" value="${esc(s.sub)}">
       <label class="f" for="sAddr">ที่อยู่ / เบอร์โทร</label><input class="inp" id="sAddr" data-in="shop" data-k="addr" value="${esc(s.addr)}">
       <label class="f" for="sFoot">ข้อความท้ายบิล</label><input class="inp" id="sFoot" data-in="shop" data-k="footer" value="${esc(s.footer)}">
-      <label class="f" for="sTables">จำนวนโต๊ะ</label><input class="inp" id="sTables" type="number" min="1" max="60" data-in="tables" value="${+state.config.tables||10}"></div>
+      <label class="f" for="sTables">จำนวนโต๊ะ</label><input class="inp" id="sTables" type="number" min="1" max="60" data-in="tables" value="${+state.config.tables||10}">
+      <label class="f" for="sPaper">ขนาดกระดาษเครื่องพิมพ์</label><select class="inp" id="sPaper" data-in="paper"><option value="80">80 มม.</option><option value="58" ${state.config.paper==='58'?'selected':''}>58 มม. (เช่น JK-5802H)</option></select></div>
     <div class="card panel"><h3>ตัวเลือกที่พิมพ์ไว้</h3><p class="hint">เพิ่มได้จากหน้าสั่งอาหาร แตะเพื่อลบ</p>${(()=>{const cm=state.config.customMods||{};const ent=Object.entries(cm).filter(([,a])=>a&&a.length);
       return ent.length?`<div class="mods">${ent.map(([c,arr])=>{const k=MENU.catById[c];return `<div><div style="font-size:13px;font-weight:600;margin-bottom:6px">${k?.icon||'•'} ${esc(k?.th||c)}</div><div class="opts">${arr.map(a=>`<button class="opt" data-a="delMod" data-c="${esc(c)}" data-n="${esc(a[0])}" aria-label="ลบ ${esc(a[0])}">${esc(a[0])}${a[1]?`<small>${a[1]>0?'+':''}${a[1]}</small>`:''}<b>×</b></button>`).join('')}</div></div>`}).join('')}</div>`:'<div class="empty" style="padding:14px">ยังไม่มี</div>'})()}</div>
   </div>
@@ -1056,6 +1070,14 @@ const A={
     if(navigator.canShare&&navigator.canShare({files:[ktFile]}))navigator.share({files:[ktFile]}).then(()=>markSent()).catch(e=>{if(e&&e.name!=='AbortError')toast('แชร์ไม่ได้')});
     else{saveFile(ktFile.name,ktFile);markSent()}},
   closeSheet:()=>closeSheet(),
+  home:()=>{if(state.view==='login')return;A.closeCart();closeSheet();
+    if(state.view==='floor'&&window.scrollY<10){location.reload();return}
+    state.view='floor';state.activeId=null;state.draft=null;state.histAll=false;render();window.scrollTo({top:0,behavior:'smooth'})},
+  tables:()=>{if(state.readOnly){toast('บัญชีนี้ดูได้อย่างเดียว');return}tablesSheet()},
+  tblN:t=>{const cur=+state.config.tables||10,n=Math.max(1,Math.min(60,cur+ +t.dataset.d));
+    if(n<cur&&(state.orders['table-'+cur]?.items||[]).length){toast(tableName(cur)+' ยังมีออเดอร์อยู่ ลดไม่ได้');return}
+    state.config.tables=n;saveConfig();refreshSheet()},
+  tblDone:()=>{document.activeElement?.blur?.();setTimeout(()=>{closeSheet();render()},50)},
   login:async()=>{const em=$('#lgE').value.trim(),pw=$('#lgP').value;if(!em||!pw){toast('ใส่อีเมลและรหัสผ่าน');return}const b=$('#lgBtn');b.disabled=true;b.textContent='กำลังเข้าสู่ระบบ…';
     try{const c=await FB_AUTH.signInWithEmailAndPassword(em,pw);goFirebase(c.user)}catch(e){b.disabled=false;b.textContent='เข้าสู่ระบบ';toast(e&&e.code==='auth/network-request-failed'?'ไม่มีอินเทอร์เน็ต':e&&/api-key|invalid-api/.test(e.code||'')?'config ไม่ถูกต้อง วาง firebaseConfig ใหม่ด้านล่าง':e&&e.code==='auth/unauthorized-domain'?'โดเมนนี้ยังไม่ได้เพิ่มใน Authorized domains':'อีเมลหรือรหัสผ่านไม่ถูกต้อง')}},
   fbConnect:()=>{const cfg=parseFbConfig($('#fbCfg').value);if(!cfg){toast('อ่าน config ไม่ได้ ต้องมี apiKey, projectId, appId');return}
@@ -1131,6 +1153,8 @@ document.addEventListener('change',e=>{const t=e.target;const k=t.dataset?.in;if
     else{pr[id]=v;state.config.prices=pr}saveConfig();toast('บันทึกราคาแล้ว')}
   else if(k==='shop'){state.config.shop={...(state.config.shop||{}),[t.dataset.k]:t.value};saveConfig()}
   else if(k==='tables'){state.config.tables=Math.max(1,Math.min(60,+t.value||10));saveConfig()}
+  else if(k==='tname'){const tn={...(state.config.tableNames||{})};const v=t.value.trim();if(v)tn[t.dataset.n]=v;else delete tn[t.dataset.n];state.config.tableNames=tn;saveConfig();syncTableLabels();if(state.view==='floor'&&!$('#ov'))render()}
+  else if(k==='paper'){state.config.paper=t.value;saveConfig();toast('ตั้งกระดาษ '+t.value+' มม. แล้ว')}
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if($('#ov'))closeSheet();else A.closeCart()}
   if(e.key==='Enter'&&e.target.dataset?.in==='search'){e.preventDefault();const q=state.search.trim().toLowerCase();if(!q)return;
@@ -1143,6 +1167,8 @@ setInterval(()=>{if(state.view==='floor'&&state.ready&&!$('#ov'))render()},60000
 const FIREBASE_CONFIG={apiKey:"AIzaSyAHihr_liJ-VIVOTBzj_EFirbqBjCevj_s",authDomain:"da-shop-d7ddd.firebaseapp.com",projectId:"da-shop-d7ddd",storageBucket:"da-shop-d7ddd.firebasestorage.app",messagingSenderId:"144083307959",appId:"1:144083307959:web:4a6c8da60084d6e2876c32"}; // DA SHOP
 const FBV='10.12.2';let FB_AUTH=null;
 const FBStore={...Cloud,loaded:{},
+  start(db){const W=q=>({onSnapshot:(n,e)=>q.onSnapshot({includeMetadataChanges:true},n,e),orderBy:(...a)=>W(q.orderBy(...a)),limit:(...a)=>W(q.limit(...a))});
+    Cloud.start.call(this,{collection:p=>W(db.collection(p)),doc:p=>W(db.doc(p))});this.db=db},
   async saveConfig(c){const cm={};for(const[k,a]of Object.entries(c.customMods||{}))cm[k]=(a||[]).map(x=>Array.isArray(x)?{n:x[0],p:x[1]}:x);await this.db.doc('config/main').set({...c,customMods:cm})},
   async closeBill(b){const ref=this.db.doc('days/'+b.date);return this.db.runTransaction(async tx=>{const s=await tx.get(ref);const bills=[...((s.exists&&s.data().bills)||[])];const nb={...b,no:billNo(b.date,bills.length+1)};bills.push(nb);tx.set(ref,{date:b.date,bills});return nb})},
   async voidBill(date,no){const ref=this.db.doc('days/'+date);await this.db.runTransaction(async tx=>{const s=await tx.get(ref);if(!s.exists)return;const bills=(s.data().bills||[]).map(x=>x.no===no?{...x,void:true}:x);tx.set(ref,{date,bills})})}};
