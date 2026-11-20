@@ -326,6 +326,10 @@ body.locked nav.tabs{visibility:hidden}
 .slot:hover{background:var(--green-soft)}
 @media (max-width:420px){.plan{gap:7px;padding:10px;grid-auto-rows:94px}.pt .pn{font-size:17.5px}.pt .ps{font-size:12px}.pt .ps b{font-size:17px}}
 .sec-h{flex-wrap:wrap;align-items:center}.sec-h h2{white-space:nowrap}.sec-h .btn{white-space:nowrap}
+.mvgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;max-height:52vh;overflow:auto;padding:2px}
+.mv{border:1px solid var(--line);border-radius:12px;padding:12px 8px;background:var(--surface-2);display:flex;flex-direction:column;align-items:center;gap:2px}
+.mv b{font-size:16px}.mv small{color:var(--muted);font-size:12px}
+.mv.busy{background:var(--yolk-soft);border-color:var(--yolk)}
 .themes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .th{border:1px solid var(--line);border-radius:12px;padding:10px 6px;background:var(--surface);font-size:13px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px}
 .th.on{border:2px solid var(--green);background:var(--green-soft)}
@@ -752,7 +756,7 @@ function renderCart(){
   const c=$('#cart');if(!c)return;const o=getActive();if(!o)return;
   const tot=orderTotal(o),cnt=orderCount(o);
   c.innerHTML=`<div class="cart-h"><h3>${esc(o.label)} <span style="color:var(--muted);font-weight:500;font-size:14px">· ${cnt} รายการ</span></h3>
-     <button class="btn sm ghost sheet-close" data-a="closeCart">ปิด</button></div>
+     <div style="display:flex;gap:6px">${state.orders[o.id]?'<button class="btn sm" data-a="move">🔀 ย้ายโต๊ะ</button>':''}<button class="btn sm ghost sheet-close" data-a="closeCart">ปิด</button></div></div>
     <div class="cart-l">${o.items.length?o.items.map(l=>`<button class="ln" data-a="line" data-k="${l.k}">
       <span class="qty">${l.qty}</span><span><span class="nm">${esc(l.name)}</span>
       ${(l.addons||[]).length?`<span class="sub" style="display:block">+ ${l.addons.map(a=>esc(a.n)).join(', ')}</span>`:''}
@@ -868,7 +872,30 @@ let rcPngFile=null;const CAN_SHARE=!!(navigator.canShare&&window.File);
 function receiptSheet(b,fresh=true){rcBill=b;rcPngFile=null;receiptPng(b).then(bl=>{if(bl&&rcBill===b)rcPngFile=new File([bl],`bill-${b.no}.png`,{type:'image/png'})}).catch(()=>{});openSheet(()=>`<h3>${fresh?'ชำระเงินเรียบร้อย':'ใบเสร็จ '+esc(b.no)}</h3><p class="lead">${fresh?`บิล ${esc(b.no)} · ${esc(b.label)}${b.method==='cash'&&b.change?' · ทอน '+baht(b.change):''}`:esc(b.label)}</p>
   <div class="rc-wrap">${receiptHTML(b)}</div>
   <div class="acts">${CAN_SHARE?'<button class="btn yolk" data-a="sharePng" style="flex-basis:100%">📤 แชร์ไปเครื่องพิมพ์</button>':''}<button class="btn ${CAN_SHARE?'':'yolk'}" data-a="print">พิมพ์บิล</button><button class="btn" data-a="dlPng">บันทึกรูป PNG</button><button class="btn" data-a="dlHtml">ไฟล์สำหรับพิมพ์</button></div>
+  <div class="acts" style="margin-top:8px">${b.void?'':'<button class="btn" data-a="reopen">↩️ เปิดบิลคืน (รวมสั่งเพิ่ม)</button>'}${/^table-\d+$/.test(b.orderId||'')?'<button class="btn" data-a="orderMore">➕ สั่งเพิ่ม (บิลใหม่)</button>':''}</div>
   <div class="acts" style="margin-top:8px"><button class="btn pri" data-a="closeSheet">เสร็จ</button></div>`)}
+/* ================== ย้ายโต๊ะ / เปิดบิลคืน ================== */
+function moveSheet(){const o=getActive();if(!o||!state.orders[o.id]){toast('ยังไม่มีรายการให้ย้าย');return}const L=layoutOf();
+  openSheet(()=>`<h3>🔀 ย้าย ${esc(o.label)} ไปที่…</h3><p class="lead">เลือกโต๊ะปลายทาง ถ้าโต๊ะนั้นมีออเดอร์อยู่ จะรวมเป็นบิลเดียวกัน</p>
+  <div class="mvgrid">${Object.keys(L).map(n=>{const id='table-'+n;if(id===o.id)return '';const t=state.orders[id];const busy=t&&t.items.length;
+    return `<button class="mv ${busy?'busy':''}" data-a="moveTo" data-n="${n}"><b>${esc(tableName(n))}</b><small>${busy?'รวมบิล · '+baht(orderTotal(t)):'ว่าง'}</small></button>`}).join('')}</div>
+  <div class="acts"><button class="btn" data-a="closeSheet">ยกเลิก</button></div>`)}
+async function moveTo(n){const src=getActive();if(!src)return;const tid='table-'+n;const tgt=state.orders[tid];const merge=!!(tgt&&tgt.items.length);
+  if(merge){if(!(await confirmBox(`รวมกับ ${esc(tableName(n))}?`,`${esc(tableName(n))} มีออเดอร์อยู่แล้ว รายการของ ${esc(src.label)} จะรวมเข้าไปเป็นบิลเดียว`,'รวมบิล')))return}else closeSheet();
+  const s=clone(src);let dst;
+  if(merge){dst=clone(tgt);dst.items=[...dst.items,...s.items];dst.voids=[...(dst.voids||[]),...(s.voids||[])];dst.openedAt=Math.min(dst.openedAt,s.openedAt);dst.kround=Math.max(dst.kround||0,s.kround||0)}
+  else dst={...s,id:tid,type:'table',no:+n,label:tableName(n)};
+  dst.updatedAt=Date.now();state.orders[tid]=dst;delete state.orders[src.id];queueSave(tid);queueSave(src.id);
+  state.activeId=tid;state.draft=null;renderOrder();toast(`${merge?'รวมกับ':'ย้ายไป'} ${tableName(n)} แล้ว`)}
+async function reopenBill(b){if(!b||b.void){toast('บิลนี้ถูกยกเลิกไปแล้ว');return}if(state.readOnly){toast('บัญชีนี้ดูได้อย่างเดียว');return}
+  if(!(await confirmBox('เปิดบิลคืน?',`บิล ${esc(b.no)} (${baht(b.total)}) จะถูกยกเลิก และรายการทั้งหมดกลับไปที่ ${esc(b.label)} สั่งเพิ่มแล้วคิดเงินใหม่เป็นบิลเดียว (ส่วนลดต้องใส่ใหม่)`,'เปิดบิลคืน')))return;
+  try{await B.voidBill(b.date,b.no)}catch(e){writeErr(e);return}
+  const id=b.orderId||('ta-'+uid());const m=/^table-(\d+)$/.exec(id);
+  const items=(b.items||[]).map(l=>({k:uid(),id:l.id,v:'',name:l.name,price:l.price,qty:l.qty,addons:l.addons||[],note:l.note||'',cat:l.cat,opts:l.opts||[],optp:l.optp||[],sent:l.qty}));
+  const cur=state.orders[id];let o;
+  if(cur&&cur.items.length){o=clone(cur);o.items=[...items,...o.items]}
+  else o={id,type:m?'table':'ta',no:m?+m[1]:0,label:m?tableName(+m[1]):b.label,customer:b.customer||'',items,openedAt:b.openedAt||b.at,updatedAt:Date.now(),kround:1};
+  state.orders[id]=o;queueSave(id);state.activeId=id;state.draft=null;state.view='order';state.group='all';state.cat='all';state.search='';render();window.scrollTo(0,0);toast('เปิดบิลคืนแล้ว สั่งเพิ่มได้เลย')}
 function printBill(b){$('#printArea').innerHTML=receiptHTML(b);try{window.print()}catch(e){toast('พิมพ์จากหน้านี้ไม่ได้ ใช้ “ไฟล์สำหรับพิมพ์” แทน')}}
 /* ================== โต๊ะ ================== */
 const DEFAULT_TN={6:'1 ยาว',7:'2 ยาว',8:'3 ยาว',9:'4 ยาว',10:'นอกบ้าน'};
@@ -1130,6 +1157,10 @@ const A={
     if(navigator.canShare&&navigator.canShare({files:[ktFile]}))navigator.share({files:[ktFile]}).then(()=>markSent()).catch(e=>{if(e&&e.name!=='AbortError')toast('แชร์ไม่ได้')});
     else{saveFile(ktFile.name,ktFile);markSent()}},
   closeSheet:()=>closeSheet(),
+  move:()=>{if(state.readOnly){toast('บัญชีนี้ดูได้อย่างเดียว');return}A.closeCart();moveSheet()},
+  moveTo:t=>moveTo(+t.dataset.n),
+  reopen:()=>reopenBill(rcBill),
+  orderMore:()=>{const m=/^table-(\d+)$/.exec(rcBill?.orderId||'');closeSheet();if(m)openTable(+m[1])},
   theme:t=>{if(state.readOnly){toast('บัญชีนี้ดูได้อย่างเดียว');return}state.config.theme=t.dataset.t;saveConfig();render()},
   mode:t=>{setLocalPref('mode',t.dataset.k);render()},
   tsize:t=>{setLocalPref('zoom',t.dataset.k);render()},
